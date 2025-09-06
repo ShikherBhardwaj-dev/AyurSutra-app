@@ -8,13 +8,15 @@ import Notifications from "./components/Notifications";
 import Progress from "./components/Progress";
 import FloatingActionButton from "./components/FloatingActionButton";
 import Footer from "./components/Footer";
+import AuthContainer from "./components/auth/AuthContainer";
 import { useAppData } from "./hooks/useAppData";
 
 const App = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [userRole, setUserRole] = useState("patient"); // 'patient' or 'practitioner'
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [isMenuSticky, setIsMenuSticky] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Authentication state
+  const [user, setUser] = useState(null); // User data
 
   const {
     notifications,
@@ -24,7 +26,27 @@ const App = () => {
     feedbackData,
   } = useAppData();
 
+  // Handle successful authentication
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+    setActiveTab("dashboard");
+  };
+
+  // Get user role from user data
+  const getUserRole = () => {
+    return user?.userType || "patient";
+  };
+
   const renderActiveTab = () => {
+    const userRole = getUserRole();
+
     switch (activeTab) {
       case "dashboard":
         return (
@@ -32,6 +54,7 @@ const App = () => {
             userRole={userRole}
             patientProgress={patientProgress}
             notifications={notifications}
+            user={user}
           />
         );
       case "scheduling":
@@ -61,17 +84,25 @@ const App = () => {
             userRole={userRole}
             patientProgress={patientProgress}
             notifications={notifications}
+            user={user}
           />
         );
     }
   };
 
+  // If not authenticated, show auth pages
+  if (!isAuthenticated) {
+    return <AuthContainer onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // Main application (authenticated user)
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        userRole={userRole}
-        setUserRole={setUserRole}
+        userRole={getUserRole()}
         notifications={notifications}
+        user={user}
+        onLogout={handleLogout}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
