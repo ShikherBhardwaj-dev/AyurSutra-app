@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import LoginPage from "./LoginPage";
 import SignupPage from "./SignupPage";
 
-const AuthContainer = ({ onAuthSuccess }) => {
+const AuthContainer = ({ onAuthSuccess, onBackToLanding }) => {
   const [currentPage, setCurrentPage] = useState("login"); // 'login' or 'signup'
 
   const handleSwitchToSignup = () => {
@@ -19,11 +19,13 @@ const AuthContainer = ({ onAuthSuccess }) => {
         <LoginPage
           onSwitchToSignup={handleSwitchToSignup}
           onAuthSuccess={onAuthSuccess}
+          onBackToLanding={onBackToLanding}
         />
       ) : (
         <SignupPage
           onSwitchToLogin={handleSwitchToLogin}
           onAuthSuccess={onAuthSuccess}
+          onBackToLanding={onBackToLanding}
         />
       )}
     </div>
