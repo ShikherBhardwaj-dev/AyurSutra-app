@@ -46,7 +46,7 @@ A comprehensive, modern web application for managing Panchakarma therapy session
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/your-username/ayursutra.git
+   git clone https://github.com/ShikherBhardwaj-dev/AyurSutra-app.git
    cd ayursutra
    ```
 
