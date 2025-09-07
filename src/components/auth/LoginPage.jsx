@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Leaf, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Leaf, Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
 
-const LoginPage = ({ onSwitchToSignup, onAuthSuccess }) => {
+const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -71,6 +71,17 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+      {/* Back to Landing Button */}
+      {onBackToLanding && (
+        <button
+          onClick={onBackToLanding}
+          className="fixed top-6 left-6 flex items-center text-gray-600 hover:text-green-600 font-medium transition-colors z-50"
+        >
+          <ArrowLeft className="h-5 w-5 mr-2" />
+          Back to Home
+        </button>
+      )}
+
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">

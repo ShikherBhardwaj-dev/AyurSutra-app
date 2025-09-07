@@ -9,14 +9,16 @@ import Progress from "./components/Progress";
 import FloatingActionButton from "./components/FloatingActionButton";
 import Footer from "./components/Footer";
 import AuthContainer from "./components/auth/AuthContainer";
+import LandingPage from "./components/LandingPage";
 import { useAppData } from "./hooks/useAppData";
 
 const App = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [isMenuSticky, setIsMenuSticky] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Authentication state
-  const [user, setUser] = useState(null); // User data
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [showLanding, setShowLanding] = useState(true); // New state for landing page
 
   const {
     notifications,
@@ -30,6 +32,7 @@ const App = () => {
   const handleAuthSuccess = (userData) => {
     setUser(userData);
     setIsAuthenticated(true);
+    setShowLanding(false); // Hide landing page after auth
   };
 
   // Handle logout
@@ -37,6 +40,13 @@ const App = () => {
     setIsAuthenticated(false);
     setUser(null);
     setActiveTab("dashboard");
+    setShowLanding(true); // Show landing page again
+  };
+
+  // Handle "Get Started" button from landing page
+  const handleGetStarted = () => {
+    setShowLanding(false);
+    // This will show the auth container since isAuthenticated is false
   };
 
   // Get user role from user data
@@ -90,9 +100,19 @@ const App = () => {
     }
   };
 
+  // Show landing page first
+  if (showLanding) {
+    return <LandingPage onGetStarted={handleGetStarted} />;
+  }
+
   // If not authenticated, show auth pages
   if (!isAuthenticated) {
-    return <AuthContainer onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <AuthContainer
+        onAuthSuccess={handleAuthSuccess}
+        onBackToLanding={() => setShowLanding(true)}
+      />
+    );
   }
 
   // Main application (authenticated user)
