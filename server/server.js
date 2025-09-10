@@ -109,6 +109,13 @@ const userSchema = new mongoose.Schema(
           inApp: { type: Boolean, default: true },
         },
       },
+      // Patient-specific wellness data
+      wellnessMetrics: {
+        sleepQuality: { type: Number, default: 0 },
+        energyLevel: { type: Number, default: 0 },
+        overallWellness: { type: Number, default: 0 },
+        lastUpdated: { type: Date, default: Date.now },
+      },
     },
     // For practitioners
     practitionerInfo: {
@@ -123,6 +130,140 @@ const userSchema = new mongoose.Schema(
         end: String,
       },
       workingDays: [String],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Patient Progress Schema
+const progressSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    overallProgress: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    completedSessions: {
+      type: Number,
+      default: 0,
+    },
+    totalSessions: {
+      type: Number,
+      default: 21, // Typical Panchakarma duration
+    },
+    nextMilestone: {
+      type: String,
+      default: "Complete initial assessment",
+    },
+    wellnessScores: [
+      {
+        date: { type: Date, default: Date.now },
+        wellness: Number,
+        energy: Number,
+        sleep: Number,
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Notifications Schema
+const notificationSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    title: {
+      type: String,
+      required: true,
+    },
+    message: {
+      type: String,
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["pre", "post", "reminder", "appointment", "general"],
+      default: "general",
+    },
+    priority: {
+      type: String,
+      enum: ["low", "medium", "high"],
+      default: "medium",
+    },
+    read: {
+      type: Boolean,
+      default: false,
+    },
+    scheduledFor: Date,
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Therapy Sessions Schema
+const sessionSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    practitionerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["abhyanga", "shirodhara", "swedana", "basti", "nasya", "other"],
+      default: "abhyanga",
+    },
+    date: {
+      type: Date,
+      required: true,
+    },
+    time: {
+      type: String,
+      required: true,
+    },
+    duration: {
+      type: Number, // in minutes
+      default: 60,
+    },
+    status: {
+      type: String,
+      enum: ["scheduled", "in-progress", "completed", "cancelled"],
+      default: "scheduled",
+    },
+    progress: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    notes: String,
+    feedback: {
+      wellness: Number,
+      energy: Number,
+      sleep: Number,
+      comments: String,
     },
   },
   {
@@ -162,6 +303,9 @@ userSchema.methods.generateAuthToken = function () {
 };
 
 const User = mongoose.model("User", userSchema);
+const Progress = mongoose.model("Progress", progressSchema);
+const Notification = mongoose.model("Notification", notificationSchema);
+const Session = mongoose.model("Session", sessionSchema);
 
 // Auth middleware
 const authenticateToken = async (req, res, next) => {
@@ -245,6 +389,80 @@ const validateLogin = (req, res, next) => {
   next();
 };
 
+// Helper function to create initial user data
+const createInitialUserData = async (userId, userType) => {
+  try {
+    // Create initial progress record for patients
+    if (userType === "patient") {
+      const progress = new Progress({
+        userId,
+        overallProgress: Math.floor(Math.random() * 20) + 10, // Random starting progress between 10-30%
+        completedSessions: 0,
+        totalSessions: 21,
+        nextMilestone: "Complete initial assessment",
+        wellnessScores: [
+          {
+            wellness: Math.floor(Math.random() * 3) + 7, // Random score between 7-10
+            energy: Math.floor(Math.random() * 3) + 7,
+            sleep: Math.floor(Math.random() * 3) + 8,
+          },
+        ],
+      });
+      await progress.save();
+
+      // Create welcome notification
+      const welcomeNotification = new Notification({
+        userId,
+        title: "Welcome to AyurSutra!",
+        message:
+          "Your Panchakarma journey begins now. We've prepared a personalized care plan for you.",
+        type: "general",
+        priority: "high",
+      });
+      await welcomeNotification.save();
+
+      // Create sample sessions
+      const sessions = [
+        {
+          userId,
+          name: "Initial Consultation",
+          type: "other",
+          date: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+          time: "10:00 AM",
+          duration: 45,
+          status: "scheduled",
+          progress: 0,
+        },
+        {
+          userId,
+          name: "Abhyanga Therapy",
+          type: "abhyanga",
+          date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // Day after tomorrow
+          time: "2:00 PM",
+          duration: 60,
+          status: "scheduled",
+          progress: 0,
+        },
+      ];
+
+      await Session.insertMany(sessions);
+    } else {
+      // For practitioners, create different welcome notification
+      const practitionerWelcome = new Notification({
+        userId,
+        title: "Welcome, Practitioner!",
+        message:
+          "Your practitioner account is ready. You can now manage your patients' Panchakarma treatments.",
+        type: "general",
+        priority: "high",
+      });
+      await practitionerWelcome.save();
+    }
+  } catch (error) {
+    console.error("Error creating initial user data:", error);
+  }
+};
+
 // Routes
 
 // Health check
@@ -294,6 +512,9 @@ app.post("/api/auth/signup", authLimiter, validateSignup, async (req, res) => {
 
     const user = new User(userData);
     await user.save();
+
+    // Create initial user data (progress, notifications, etc.)
+    await createInitialUserData(user._id, user.userType);
 
     // Generate token
     const token = user.generateAuthToken();
@@ -404,6 +625,228 @@ app.get("/api/auth/me", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Get user error:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Get user dashboard data
+app.get("/api/dashboard", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get user progress
+    let progress = await Progress.findOne({ userId });
+    if (!progress && req.user.userType === "patient") {
+      // Create default progress if none exists
+      progress = new Progress({
+        userId,
+        overallProgress: 15,
+        completedSessions: 2,
+        totalSessions: 21,
+        nextMilestone: "Complete detoxification phase",
+      });
+      await progress.save();
+    }
+
+    // Get recent notifications
+    const notifications = await Notification.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    // Get upcoming sessions
+    const upcomingSessions = await Session.find({
+      userId,
+      date: { $gte: new Date() },
+      status: { $in: ["scheduled", "in-progress"] },
+    })
+      .sort({ date: 1 })
+      .limit(5);
+
+    // Get wellness metrics from user profile
+    const user = await User.findById(userId).select("profile.wellnessMetrics");
+    const wellnessMetrics = user?.profile?.wellnessMetrics || {
+      sleepQuality: 85,
+      energyLevel: 78,
+      overallWellness: 82,
+    };
+
+    res.json({
+      progress: progress || {
+        overallProgress: 0,
+        completedSessions: 0,
+        totalSessions: 21,
+        nextMilestone: "Begin your wellness journey",
+      },
+      notifications,
+      upcomingSessions,
+      wellnessMetrics,
+      userType: req.user.userType,
+    });
+  } catch (error) {
+    console.error("Dashboard data error:", error);
+    res.status(500).json({ message: "Error fetching dashboard data" });
+  }
+});
+
+// Get user notifications
+app.get("/api/notifications", authenticateToken, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.json({ notifications });
+  } catch (error) {
+    console.error("Notifications fetch error:", error);
+    res.status(500).json({ message: "Error fetching notifications" });
+  }
+});
+
+// Mark notification as read
+app.put("/api/notifications/:id/read", authenticateToken, async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { read: true },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    res.json({ notification });
+  } catch (error) {
+    console.error("Mark notification read error:", error);
+    res.status(500).json({ message: "Error updating notification" });
+  }
+});
+
+// Get user sessions
+app.get("/api/sessions", authenticateToken, async (req, res) => {
+  try {
+    const sessions = await Session.find({ userId: req.user._id })
+      .sort({ date: 1 })
+      .populate("practitionerId", "fullName email");
+
+    res.json({ sessions });
+  } catch (error) {
+    console.error("Sessions fetch error:", error);
+    res.status(500).json({ message: "Error fetching sessions" });
+  }
+});
+
+// Create new session
+app.post("/api/sessions", authenticateToken, async (req, res) => {
+  try {
+    const { name, type, date, time, duration, practitionerId } = req.body;
+
+    const session = new Session({
+      userId: req.user._id,
+      name,
+      type: type || "abhyanga",
+      date: new Date(date),
+      time,
+      duration: duration || 60,
+      practitionerId,
+      status: "scheduled",
+      progress: 0,
+    });
+
+    await session.save();
+
+    // Create notification for the session
+    const notification = new Notification({
+      userId: req.user._id,
+      title: "Session Scheduled",
+      message: `Your ${name} session has been scheduled for ${date} at ${time}`,
+      type: "appointment",
+      priority: "medium",
+    });
+    await notification.save();
+
+    res.status(201).json({ session });
+  } catch (error) {
+    console.error("Create session error:", error);
+    res.status(500).json({ message: "Error creating session" });
+  }
+});
+
+// Update session feedback
+app.put("/api/sessions/:id/feedback", authenticateToken, async (req, res) => {
+  try {
+    const { wellness, energy, sleep, comments } = req.body;
+
+    const session = await Session.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      {
+        feedback: { wellness, energy, sleep, comments },
+        status: "completed",
+        progress: 100,
+      },
+      { new: true }
+    );
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    // Update user progress
+    const progress = await Progress.findOne({ userId: req.user._id });
+    if (progress) {
+      progress.completedSessions += 1;
+      progress.overallProgress = Math.min(
+        100,
+        (progress.completedSessions / progress.totalSessions) * 100
+      );
+
+      // Add wellness score to history
+      progress.wellnessScores.push({
+        date: new Date(),
+        wellness,
+        energy,
+        sleep,
+      });
+
+      await progress.save();
+    }
+
+    // Update user wellness metrics
+    await User.findByIdAndUpdate(req.user._id, {
+      "profile.wellnessMetrics.sleepQuality": sleep * 10,
+      "profile.wellnessMetrics.energyLevel": energy * 10,
+      "profile.wellnessMetrics.overallWellness": wellness * 10,
+      "profile.wellnessMetrics.lastUpdated": new Date(),
+    });
+
+    res.json({ session });
+  } catch (error) {
+    console.error("Update session feedback error:", error);
+    res.status(500).json({ message: "Error updating session feedback" });
+  }
+});
+
+// Get user progress
+app.get("/api/progress", authenticateToken, async (req, res) => {
+  try {
+    const progress = await Progress.findOne({ userId: req.user._id });
+
+    if (!progress && req.user.userType === "patient") {
+      // Create default progress
+      const newProgress = new Progress({
+        userId: req.user._id,
+        overallProgress: 10,
+        completedSessions: 0,
+        totalSessions: 21,
+        nextMilestone: "Complete initial assessment",
+      });
+      await newProgress.save();
+      return res.json({ progress: newProgress });
+    }
+
+    res.json({ progress: progress || {} });
+  } catch (error) {
+    console.error("Progress fetch error:", error);
+    res.status(500).json({ message: "Error fetching progress" });
   }
 });
 
