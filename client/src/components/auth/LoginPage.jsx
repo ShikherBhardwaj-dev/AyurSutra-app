@@ -1,8 +1,11 @@
 import React, { useState } from "react";
-import { Leaf, Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
+import { Leaf, Eye, EyeOff, Mail, Lock, ArrowLeft, Loader } from "lucide-react";
+import authService from "../../services/authService";
 
 const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -15,58 +18,77 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
       ...formData,
       [name]: type === "checkbox" ? checked : value,
     });
+
+    // Clear error when user starts typing
+    if (error) {
+      setError("");
+    }
   };
 
-  const handleLogin = () => {
-    // Mock authentication - accepts any valid email/password format
+  const validateForm = () => {
     if (!formData.email || !formData.password) {
-      alert("Please fill in all fields");
-      return;
+      setError("Please fill in all fields");
+      return false;
     }
 
     if (!formData.email.includes("@")) {
-      alert("Please enter a valid email address");
-      return;
+      setError("Please enter a valid email address");
+      return false;
     }
 
     if (formData.password.length < 6) {
-      alert("Password must be at least 6 characters");
+      setError("Password must be at least 6 characters");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
       return;
     }
 
-    // Mock user data based on email
-    const mockUser = {
-      fullName:
-        formData.email.includes("doctor") ||
-        formData.email.includes("practitioner")
-          ? "Dr. Rajesh Kumar"
-          : "Priya Sharma",
-      email: formData.email,
-      userType:
-        formData.email.includes("doctor") ||
-        formData.email.includes("practitioner")
-          ? "practitioner"
-          : "patient",
-      id: "1",
-    };
+    setLoading(true);
+    setError("");
 
-    console.log("Mock login successful:", mockUser);
+    try {
+      const response = await authService.login({
+        email: formData.email,
+        password: formData.password,
+        rememberMe: formData.rememberMe,
+      });
 
-    // Call the authentication success handler
-    if (onAuthSuccess) {
-      onAuthSuccess(mockUser);
-    } else {
-      console.error("onAuthSuccess function not provided to LoginPage");
-      alert(
-        "Authentication handler not found. Please check the component setup."
-      );
+      console.log("Login successful:", response.user);
+
+      // Call the authentication success handler
+      if (onAuthSuccess) {
+        onAuthSuccess(response.user);
+      } else {
+        console.error("onAuthSuccess function not provided to LoginPage");
+        setError("Authentication handler not found. Please refresh the page.");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError(error.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleLogin();
+    if (e.key === "Enter" && !loading) {
+      handleLogin(e);
     }
+  };
+
+  const handleSocialLogin = (provider) => {
+    // Placeholder for social login implementation
+    setError(
+      `${provider} login is not yet implemented. Please use email/password login.`
+    );
   };
 
   return (
@@ -76,6 +98,7 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
         <button
           onClick={onBackToLanding}
           className="fixed top-6 left-6 flex items-center text-gray-600 hover:text-green-600 font-medium transition-colors z-50"
+          disabled={loading}
         >
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back to Home
@@ -100,7 +123,14 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
 
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <div className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Email Field */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
@@ -114,9 +144,10 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
                   value={formData.email}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Enter your email"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -134,14 +165,16 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
                   value={formData.password}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -160,24 +193,39 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
                   name="rememberMe"
                   checked={formData.rememberMe}
                   onChange={handleInputChange}
-                  className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed"
+                  disabled={loading}
                 />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
-              <a
-                href="#"
-                className="text-sm text-green-600 hover:text-green-700 font-medium"
+              <button
+                type="button"
+                onClick={() =>
+                  setError(
+                    "Password reset functionality will be available soon."
+                  )
+                }
+                className="text-sm text-green-600 hover:text-green-700 font-medium disabled:cursor-not-allowed"
+                disabled={loading}
               >
                 Forgot password?
-              </a>
+              </button>
             </div>
 
             {/* Login Button */}
             <button
-              onClick={handleLogin}
-              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-blue-700 transform hover:scale-[1.02] transition-all duration-200 shadow-lg"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-blue-700 transform hover:scale-[1.02] transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center"
             >
-              Sign In
+              {loading ? (
+                <>
+                  <Loader className="animate-spin h-5 w-5 mr-2" />
+                  Signing In...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
 
             {/* Divider */}
@@ -196,7 +244,9 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                onClick={() => handleSocialLogin("Google")}
+                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={loading}
               >
                 <img
                   src="https://developers.google.com/identity/images/g-logo.png"
@@ -207,7 +257,9 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
               </button>
               <button
                 type="button"
-                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                onClick={() => handleSocialLogin("Facebook")}
+                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={loading}
               >
                 <div className="w-5 h-5 mr-2 bg-blue-600 rounded text-white text-xs flex items-center justify-center font-bold">
                   f
@@ -215,14 +267,15 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
                 Facebook
               </button>
             </div>
-          </div>
+          </form>
 
           {/* Sign Up Link */}
           <div className="mt-6 text-center">
             <span className="text-gray-600">Don't have an account? </span>
             <button
               onClick={onSwitchToSignup}
-              className="text-green-600 hover:text-green-700 font-medium"
+              className="text-green-600 hover:text-green-700 font-medium disabled:cursor-not-allowed"
+              disabled={loading}
             >
               Sign up here
             </button>
@@ -239,6 +292,21 @@ const LoginPage = ({ onSwitchToSignup, onAuthSuccess, onBackToLanding }) => {
           <a href="#" className="text-green-600 hover:underline">
             Privacy Policy
           </a>
+        </div>
+
+        {/* Demo Credentials Helper */}
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-blue-900 mb-2">
+            Demo Credentials
+          </h3>
+          <div className="text-xs text-blue-700 space-y-1">
+            <div>
+              <strong>Patient:</strong> patient@example.com / password123
+            </div>
+            <div>
+              <strong>Practitioner:</strong> doctor@example.com / password123
+            </div>
+          </div>
         </div>
       </div>
     </div>

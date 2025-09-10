@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Bell, User, Leaf } from "lucide-react";
 import Header from "./components/Header";
 import Navigation from "./components/Navigation";
@@ -10,7 +10,9 @@ import FloatingActionButton from "./components/FloatingActionButton";
 import Footer from "./components/Footer";
 import AuthContainer from "./components/auth/AuthContainer";
 import LandingPage from "./components/LandingPage";
+import LoadingSpinner from "./components/shared/LoadingSpinner";
 import { useAppData } from "./hooks/useAppData";
+import authService from "./services/authService";
 
 const App = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -18,7 +20,8 @@ const App = () => {
   const [isMenuSticky, setIsMenuSticky] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [showLanding, setShowLanding] = useState(true); // New state for landing page
+  const [showLanding, setShowLanding] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const {
     notifications,
@@ -28,19 +31,62 @@ const App = () => {
     feedbackData,
   } = useAppData();
 
+  // Initialize authentication state on app load
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        setIsInitializing(true);
+
+        // Check if user was previously authenticated
+        const storedUser = authService.getStoredUser();
+        const token = authService.getToken();
+
+        if (storedUser && token && authService.isTokenValid()) {
+          // Try to validate token with server and refresh user data
+          const currentUser = await authService.getCurrentUser();
+
+          if (currentUser) {
+            setUser(currentUser);
+            setIsAuthenticated(true);
+            setShowLanding(false);
+            console.log("User authenticated from stored session:", currentUser);
+          }
+        }
+      } catch (error) {
+        console.error("Auth initialization failed:", error);
+        // Clear invalid auth data
+        authService.clearAuthData();
+        setIsAuthenticated(false);
+        setUser(null);
+        setShowLanding(true);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
   // Handle successful authentication
   const handleAuthSuccess = (userData) => {
     setUser(userData);
     setIsAuthenticated(true);
-    setShowLanding(false); // Hide landing page after auth
+    setShowLanding(false);
+    console.log("User authenticated:", userData);
   };
 
   // Handle logout
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-    setActiveTab("dashboard");
-    setShowLanding(true); // Show landing page again
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setIsAuthenticated(false);
+      setUser(null);
+      setActiveTab("dashboard");
+      setShowLanding(true);
+    }
   };
 
   // Handle "Get Started" button from landing page
@@ -99,6 +145,11 @@ const App = () => {
         );
     }
   };
+
+  // Show loading spinner while initializing
+  if (isInitializing) {
+    return <LoadingSpinner message="Initializing AyurSutra..." />;
+  }
 
   // Show landing page first
   if (showLanding) {
