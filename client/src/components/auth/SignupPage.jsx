@@ -1,9 +1,22 @@
 import React, { useState } from "react";
-import { Leaf, Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft } from "lucide-react";
+import {
+  Leaf,
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  Phone,
+  ArrowLeft,
+  Loader,
+} from "lucide-react";
+import authService from "../../services/authService";
 
 const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,66 +33,104 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
       ...formData,
       [name]: type === "checkbox" ? checked : value,
     });
+
+    // Clear error when user starts typing
+    if (error) {
+      setError("");
+    }
   };
 
-  const handleSignup = () => {
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match!");
+  const validateForm = () => {
+    const { fullName, email, phone, password, confirmPassword, agreeToTerms } =
+      formData;
+
+    if (!fullName || !email || !phone || !password || !confirmPassword) {
+      setError("Please fill in all required fields");
+      return false;
+    }
+
+    if (fullName.trim().length < 2) {
+      setError("Full name must be at least 2 characters long");
+      return false;
+    }
+
+    if (!email.includes("@")) {
+      setError("Please enter a valid email address");
+      return false;
+    }
+
+    if (phone.trim().length < 10) {
+      setError("Please enter a valid phone number (at least 10 digits)");
+      return false;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return false;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords don't match!");
+      return false;
+    }
+
+    if (!agreeToTerms) {
+      setError("Please agree to the terms and conditions");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
       return;
     }
 
-    if (!formData.agreeToTerms) {
-      alert("Please agree to the terms and conditions");
-      return;
-    }
+    setLoading(true);
+    setError("");
 
-    // Basic validation
-    if (
-      !formData.fullName ||
-      !formData.email ||
-      !formData.phone ||
-      !formData.password
-    ) {
-      alert("Please fill in all required fields");
-      return;
-    }
+    try {
+      const signupData = {
+        fullName: formData.fullName.trim(),
+        email: formData.email.toLowerCase().trim(),
+        phone: formData.phone.trim(),
+        password: formData.password,
+        userType: formData.userType,
+      };
 
-    if (!formData.email.includes("@")) {
-      alert("Please enter a valid email address");
-      return;
-    }
+      const response = await authService.signup(signupData);
 
-    if (formData.password.length < 6) {
-      alert("Password must be at least 6 characters");
-      return;
-    }
+      console.log("Signup successful:", response.user);
 
-    // Mock user creation - simulate successful signup
-    const newUser = {
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      userType: formData.userType,
-      id: Date.now().toString(),
-    };
-
-    console.log("Mock signup successful:", newUser);
-
-    // Call the authentication success handler to log the user in
-    if (onAuthSuccess) {
-      onAuthSuccess(newUser);
-    } else {
-      console.error("onAuthSuccess function not provided to SignupPage");
-      alert(
-        "Authentication handler not found. Please check the component setup."
-      );
+      // Call the authentication success handler to log the user in
+      if (onAuthSuccess) {
+        onAuthSuccess(response.user);
+      } else {
+        console.error("onAuthSuccess function not provided to SignupPage");
+        setError("Authentication handler not found. Please refresh the page.");
+      }
+    } catch (error) {
+      console.error("Signup error:", error);
+      setError(error.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleSignup();
+    if (e.key === "Enter" && !loading) {
+      handleSignup(e);
     }
+  };
+
+  const handleSocialSignup = (provider) => {
+    // Placeholder for social signup implementation
+    setError(
+      `${provider} signup is not yet implemented. Please use email/password registration.`
+    );
   };
 
   return (
@@ -89,6 +140,7 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
         <button
           onClick={onBackToLanding}
           className="fixed top-6 left-6 flex items-center text-gray-600 hover:text-green-600 font-medium transition-colors z-50"
+          disabled={loading}
         >
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back to Home
@@ -113,7 +165,14 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
 
         {/* Signup Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <div className="space-y-6">
+          <form onSubmit={handleSignup} className="space-y-6">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
             {/* User Type Selection */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
@@ -125,7 +184,7 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                     formData.userType === "patient"
                       ? "border-green-500 bg-green-50 text-green-700"
                       : "border-gray-300 hover:border-gray-400"
-                  }`}
+                  } ${loading ? "cursor-not-allowed opacity-50" : ""}`}
                 >
                   <input
                     type="radio"
@@ -133,6 +192,7 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                     value="patient"
                     checked={formData.userType === "patient"}
                     onChange={handleInputChange}
+                    disabled={loading}
                     className="sr-only"
                   />
                   <User className="h-5 w-5 mr-2" />
@@ -143,7 +203,7 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                     formData.userType === "practitioner"
                       ? "border-green-500 bg-green-50 text-green-700"
                       : "border-gray-300 hover:border-gray-400"
-                  }`}
+                  } ${loading ? "cursor-not-allowed opacity-50" : ""}`}
                 >
                   <input
                     type="radio"
@@ -151,6 +211,7 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                     value="practitioner"
                     checked={formData.userType === "practitioner"}
                     onChange={handleInputChange}
+                    disabled={loading}
                     className="sr-only"
                   />
                   <Leaf className="h-5 w-5 mr-2" />
@@ -172,9 +233,10 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                   value={formData.fullName}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Enter your full name"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -192,9 +254,10 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                   value={formData.email}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Enter your email"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -212,9 +275,10 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                   value={formData.phone}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Enter your phone number"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -232,14 +296,16 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                   value={formData.password}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Create a password"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -263,14 +329,16 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="Confirm your password"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
                   {showConfirmPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -289,26 +357,49 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                 checked={formData.agreeToTerms}
                 onChange={handleInputChange}
                 required
-                className="mt-1 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                disabled={loading}
+                className="mt-1 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed"
               />
               <span className="ml-2 text-sm text-gray-600">
                 I agree to the{" "}
-                <a href="#" className="text-green-600 hover:underline">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setError("Terms of Service page will be available soon.")
+                  }
+                  className="text-green-600 hover:underline disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
                   Terms of Service
-                </a>{" "}
+                </button>{" "}
                 and{" "}
-                <a href="#" className="text-green-600 hover:underline">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setError("Privacy Policy page will be available soon.")
+                  }
+                  className="text-green-600 hover:underline disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
                   Privacy Policy
-                </a>
+                </button>
               </span>
             </div>
 
             {/* Signup Button */}
             <button
-              onClick={handleSignup}
-              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-blue-700 transform hover:scale-[1.02] transition-all duration-200 shadow-lg"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-blue-700 transform hover:scale-[1.02] transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center"
             >
-              Create Account
+              {loading ? (
+                <>
+                  <Loader className="animate-spin h-5 w-5 mr-2" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
             </button>
 
             {/* Divider */}
@@ -327,7 +418,9 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                onClick={() => handleSocialSignup("Google")}
+                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={loading}
               >
                 <img
                   src="https://developers.google.com/identity/images/g-logo.png"
@@ -338,7 +431,9 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
               </button>
               <button
                 type="button"
-                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                onClick={() => handleSocialSignup("Facebook")}
+                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={loading}
               >
                 <div className="w-5 h-5 mr-2 bg-blue-600 rounded text-white text-xs flex items-center justify-center font-bold">
                   f
@@ -346,14 +441,15 @@ const SignupPage = ({ onSwitchToLogin, onAuthSuccess, onBackToLanding }) => {
                 Facebook
               </button>
             </div>
-          </div>
+          </form>
 
           {/* Login Link */}
           <div className="mt-6 text-center">
             <span className="text-gray-600">Already have an account? </span>
             <button
               onClick={onSwitchToLogin}
-              className="text-green-600 hover:text-green-700 font-medium"
+              className="text-green-600 hover:text-green-700 font-medium disabled:cursor-not-allowed"
+              disabled={loading}
             >
               Sign in here
             </button>
